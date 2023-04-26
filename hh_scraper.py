@@ -153,6 +153,7 @@ def parse_response():
             except Exception as e:
                 print(e)
                 print("Error occured with URL: {}".format(url))
+            get_job_data()
         
 
 def get_job_data():
@@ -209,7 +210,7 @@ def main():
     """
     #get_data()
     parse_response()
-    get_job_data()
+    
 
 
 
