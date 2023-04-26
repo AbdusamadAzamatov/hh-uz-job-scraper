@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
+import re
 import json
-import time
 
 
 headers = {         
@@ -24,47 +24,69 @@ headers = {
     }
 
 def get_data():
+    """
+    Scrapes the job vacancy URLs from the hh.uz website for Tashkent city, Uzbekistan.
+    
+    Returns:
+        None. The URLs are written to a JSON file called 'urls.json' in the current working directory.
+        
+    Raises:
+        None. However, if the request to the website returns a status code other than 200, no data is scraped.
+    """
+        
     base_url = 'https://tashkent.hh.uz/search/vacancy?text=&area=2759&page={}'
     
 
-    # req = requests.get(base_url, headers=headers)
-    # if  req.status_code != 200:
-    #     return
-    # soup = BeautifulSoup(req.text, 'lxml')    
+    req = requests.get(base_url, headers=headers)
+    if  req.status_code != 200:
+        return
+    soup = BeautifulSoup(req.text, 'lxml')    
 
-    # num_pages = int(soup.find("div", class_="pager").find_all("span",recursive=False)[-1].find("a").find("span").text)
+    num_pages = int(soup.find("div", class_="pager").find_all("span",recursive=False)[-1].find("a").find("span").text)
 
-    # urls = []
+    urls = []
 
-    # for page_num in range(num_pages):
-    # # Make a request to the page URL
-    #     url = base_url.format(page_num)
-    #     response = requests.get(url, headers=headers)
+    for page_num in range(num_pages):
+    # Make a request to the page URL
+        url = base_url.format(page_num)
+        response = requests.get(url, headers=headers)
     
-    # # Parse the HTML content using BeautifulSoup
-    #     soup1 = BeautifulSoup(response.content, 'lxml')
+    # Parse the HTML content using BeautifulSoup
+        soup1 = BeautifulSoup(response.content, 'lxml')
     
-    # # Find all the links on the page and append them to the list
-    #     for link in soup1.find_all('a', href=True):
-    #         link_url = link.get('href')
-    #         if link_url.startswith('https://tashkent.hh.uz/vacancy/'):
-    #             urls.append(link_url)
+    # Find all the links on the page and append them to the list
+        for link in soup1.find_all('a', href=True):
+            link_url = link.get('href')
+            if link_url.startswith('https://tashkent.hh.uz/vacancy/'):
+                urls.append(link_url)
 
 
-    # # Write the URLs to a JSON file
-    # with open('urls.json', 'w') as f:
-    #     json.dump(urls, f)
+    # Write the URLs to a JSON file
+    with open('urls.json', 'w') as f:
+        json.dump(urls, f)
 
     
 
 def parse_response():
+    """
+    Parses the HTML content of each URL in the 'urls.json' file and extracts relevant job information.
+
+    """
+
     with open('urls.json', 'r', encoding='UTF-8') as f:
         urls = json.load(f)
 
     
     
         job_listings = []
-        for url in urls:
+        counter = 0
+
+        for url in urls:        
+            if counter >= 30:
+                # Write the first 30 job listings to a JSON file
+                # Modify this number to scrape more or less job listings
+                break
+
             response = requests.get(url, headers=headers)
             try:
                 soup = BeautifulSoup(response.text, 'lxml')
@@ -77,7 +99,7 @@ def parse_response():
                     vacancy_data['Job Title'] = None
                 
                 if vacancies.find("span",attrs={"data-qa":"vacancy-experience"}):
-                    vacancy_data['Employement Type and Schedule'] = vacancies.find("p",attrs={"class":"vacancy-description-list-item"}).text.strip().replace("\u202f", " ")
+                    vacancy_data['Employement Type and Schedule'] = vacancies.find("p",attrs={"data-qa":"vacancy-view-employment-mode"}).text.strip().replace("\u202f", " ")
                 else:
                     vacancy_data['Employement Type and Schedule'] = None
 
@@ -97,7 +119,8 @@ def parse_response():
                     vacancy_data['Years of Experience Required'] = None
 
                 if vacancies.find("div", class_="bloko-tag-list"):
-                    vacancy_data['List of Skills Required'] = vacancies.find("div", class_="bloko-tag-list").text.strip().replace("\u202f", " ")
+                    skills = [tag.span.text.strip() for tag in vacancies.find("div", class_="bloko-tag-list").find_all("div")]
+                    vacancy_data['List of Skills Required'] = ', '.join(skills)
                 else:
                     vacancy_data['List of Skills Required'] = None
 
@@ -117,41 +140,55 @@ def parse_response():
                     vacancy_data['Job Description'] = None
 
                 """if only logged in"""
-                #vacancy_data['Contact Email'] =soup.find(
+                # vacancy_data['Contact Email'] =soup.find(
                 # "div",attrs={"data-qa":"vacancy-contacts__fio"}).text.strip()
-                ###                
-                #vacancy_data['Job Market'] = vacancy[0].text.strip().replace("\u202f", " ")
                 vacancy_data['Source'] = 'hh.uz'
 
                 job_listings.append(vacancy_data)
 
-                print(vacancy_data)
+                with open('hh_uz.json', 'w', encoding='UTF-8') as f:
+                    json.dump(job_listings, f, ensure_ascii=False, indent=4)
+
+                #print(vacancy_data)
 
             except Exception as e:
                 print(e)
                 print("Error occured with URL: {}".format(url))
+        
 
+def get_job_data():
+    """
+    Loads the JSON file containing the job data and returns a list of dictionaries.
 
-                # create a list of Oneapp-formatted job data
-                oneapp_data_list = []
-                for job_data in job_listings:
-                    oneapp_data = match_fields(job_data)
-                    oneapp_data_list.append(oneapp_data)
+    """
 
-                # write the Oneapp-formatted job data to a JSON file
-                with open('oneapp_jobs.json', 'w', encoding='UTF-8') as f:
-                    json.dump(oneapp_data_list, f, ensure_ascii=False, indent=4)           
+    
+    with open('hh_uz.json', 'r', encoding='UTF-8') as f:
+        job_listings = json.load(f)
+        
+    # create a list of Oneapp-formatted job data
+    oneapp_data_list = []
+    for job_data in job_listings:
+        oneapp_data = match_fields(job_data)
+        oneapp_data_list.append(oneapp_data)
 
+    # write the Oneapp-formatted job data to a JSON file
+    with open('oneapp_jobs.json', 'w', encoding='UTF-8') as f:
+        json.dump(oneapp_data_list, f, ensure_ascii=False, indent=4)
 
-                time.sleep(2)
 
 def match_fields(job_data):
+    """
+    Matches the fields in the job_data to the fields in the Oneapp job template.
+
+    """
     oneapp_data = {}
     oneapp_data['Job Title'] = job_data['Job Title']  # add your code to get this data from the job_data
     oneapp_data['years of experience required'] = job_data['Years of Experience Required']
     oneapp_data['job description'] = job_data['Job Description']
     oneapp_data['Salary'] = job_data['Salary']  # add your code to get this data from the job_data 
     oneapp_data['Employement type'] = job_data['Employement Type and Schedule']
+    oneapp_data['Description'] = job_data['Job Description']
 
     # create a list of skills needed for each job and add it to the oneapp_data
     skills = []
@@ -167,8 +204,13 @@ def match_fields(job_data):
 
 
 def main():
+    """
+    Main function that calls the other functions.
+    
+    """
     #get_data()
     parse_response()
+    get_job_data()
 
 
 
