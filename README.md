@@ -3,3 +3,5 @@ Description: This is a Python script that uses BeautifulSoup4 and lxml to scrape
 Usage: To use the script, you'll need to have Python installed on your machine, along with the BeautifulSoup4 and lxml libraries. You can run the script from the command line by running the command python `main.py`. Before running the script, make sure to update the `urls.json` file with the URLs of the job listings you want to scrape.
 
 Contributing: Contributions are welcome! If you find any issues with the script, feel free to open a GitHub issue or submit a pull request.
+
+NOTE: Python script will scrap jobs(1000 vacancies) for about 20mins. When you run the code and see empty blanc, it doesn't mean that nothing is happening, it's actually scrapping! 
